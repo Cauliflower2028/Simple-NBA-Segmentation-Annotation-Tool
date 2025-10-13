@@ -7,29 +7,29 @@ A minimal, user-friendly tool for segmenting basketball players in video clips a
 [Identify Basketball Players with AI](https://blog.roboflow.com/identify-basketball-players/)
 
 ## UNDER CONSTRUCTION LOOK AT THIS INSTEAD:
-# RUN THE FOLLOWING COMMANDS
+RUN THE FOLLOWING COMMANDS:
 
-# CREATE AND ACTIVATE VENV
+#### CREATE AND ACTIVATE VENV
 conda create -n venv python=3.10 -y
 conda activate venv
 
-# UPGRADE PIP
+#### UPGRADE PIP
 pip install --upgrade pip
 
-# LOAD FFMPEG YOU HAVE TO DO THIS EVERY TIME YOU OPEN THE TERMINAL
+#### LOAD FFMPEG YOU HAVE TO DO THIS EVERY TIME YOU OPEN THE TERMINAL
 module load ffmpeg/6.1.1
 
-# Set GCC as the compiler
+#### Set GCC as the compiler
 export CC=gcc
 export CXX=g++
 
-# FOR INSTALLING DEPENDENCIES
+#### FOR INSTALLING DEPENDENCIES
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 pip install numpy wheel ninja
 pip install pycocotools
 pip install Pillow
 
-# FOR INSTALLING SAM2 REAL-TIME - RUN THE FOLLOWING COMMANDS
+#### FOR INSTALLING SAM2 REAL-TIME - RUN THE FOLLOWING COMMANDS
 git clone https://github.com/Gy920/segment-anything-2-real-time.git
 cd ./segment-anything-2-real-time
 pip install -e .
@@ -37,7 +37,7 @@ python setup.py build_ext --inplace
 (cd checkpoints && bash download_ckpts.sh)
 cd ..
 
-# FOR INSTALLING DEPENDENCIES - RUN THE FOLLOWING COMMANDS
+#### FOR INSTALLING DEPENDENCIES - RUN THE FOLLOWING COMMANDS
 pip install gdown
 pip install inference-gpu
 pip install git+https://github.com/roboflow/supervision.git
@@ -45,16 +45,16 @@ pip install git+https://github.com/roboflow/sports.git@feat/basketball
 pip install transformers num2words
 pip install flash-attn --no-build-isolation
 
-# SET ENVIRONMENT VARIABLE
+#### SET ENVIRONMENT VARIABLE
 export ONNXRUNTIME_EXECUTION_PROVIDERS="[CUDAExecutionProvider]"
 
-# SETTING UP API KEYS
-# CREATE A FILE NAMED ".env" ".env" SHOULD HAVE THE FOLLWING CONTENTS:
+#### SETTING UP API KEYS
+#### CREATE A FILE NAMED ".env" ".env" SHOULD HAVE THE FOLLWING CONTENTS:
 HF_TOKEN=your_huggingface_token_here
 ROBOFLOW_API_KEY=your_roboflow_key_here
 
-# GET HF_TOKEN FROM https://huggingface.co/settings/profile
-# GET ROBOFLOW_API_KEY FROM https://app.roboflow.com/settings/api
+#### GET HF_TOKEN FROM https://huggingface.co/settings/profile
+#### GET ROBOFLOW_API_KEY FROM https://app.roboflow.com/settings/api
 
 ## DONT LOOK
 ## Prerequisites 
