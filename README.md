@@ -69,13 +69,6 @@ This tool provides a simple GUI for segmenting basketball players in video clips
   git clone https://github.com/Gy920/segment-anything-2-real-time.git
   ```
 
-### 2. X-AnyLabeling Setup (Optional/Recommended)
-
-Follow the two-part installation guide for [X-AnyLabeling](https://github.com/CVHub520/X-AnyLabeling):
-
-- [Part 1: Interactive Video Object Segmentation](https://github.com/CVHub520/X-AnyLabeling/blob/main/examples/interactive_video_object_segmentation/README.md)
-- [Part 2: Get Started](https://github.com/CVHub520/X-AnyLabeling/blob/main/docs/en/get_started.md)
-
 **Important steps:**
 
 - Install ONNX Runtime GPU:
@@ -241,13 +234,6 @@ ROBOFLOW_API_KEY=your_roboflow_key_here
 
 ---
 
-### (Optional) X-AnyLabeling Setup
-
-Follow the two-part installation guide for [X-AnyLabeling](https://github.com/CVHub520/X-AnyLabeling):
-
-- [Part 1: Interactive Video Object Segmentation](https://github.com/CVHub520/X-AnyLabeling/blob/main/examples/interactive_video_object_segmentation/README.md)
-- [Part 2: Get Started](https://github.com/CVHub520/X-AnyLabeling/blob/main/docs/en/get_started.md)
-
 **Important steps:**
 
 - Install ONNX Runtime GPU:
@@ -271,7 +257,6 @@ Follow the two-part installation guide for [X-AnyLabeling](https://github.com/CV
 ## Troubleshooting
 
 - **Modules not found:** Make sure you have loaded CUDA, cuDNN, and ffmpeg modules in every new terminal session.
-- **Missing _C.so:** If you get errors about missing `_C.so`, copy it from `/fs/scratch/PAS3184/baicheng/` to the correct directory.
 - **API errors:** Double-check your `.env` file for correct HuggingFace and Roboflow tokens.
 - **GUI issues:** If the GUI does not display, ensure you have X11 forwarding enabled when using SSH.
 - **PyTorch install issues:** Always use the custom index URL for torch, torchvision, and torchaudio as described above.
