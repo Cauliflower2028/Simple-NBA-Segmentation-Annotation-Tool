@@ -1,4 +1,4 @@
-# Simple-NBA-Segmentation-Annotation-Tool
+NBA-Segmentation-Annotation-Tool
 
 A minimal, user-friendly tool for segmenting basketball players in video clips and generating annotation masks, designed for research and annotation workflows.  
  **Supports GPU acceleration and is intended for use on OSC (Ohio Supercomputer Center) Linux clusters.**
