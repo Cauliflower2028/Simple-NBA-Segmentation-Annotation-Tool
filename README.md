@@ -18,9 +18,7 @@ A minimal, user-friendly tool for segmenting basketball players in video clips a
 - [Environment Setup](#environment-setup)
 - [Dependencies](#dependencies)
 - [API Keys](#api-keys)
-- [Usage](#usage)
 - [Troubleshooting](#troubleshooting)
-- [References](#references)
 
 ---
 
