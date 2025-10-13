@@ -270,8 +270,10 @@ Follow the two-part installation guide for [X-AnyLabeling](https://github.com/CV
 - [X-AnyLabeling](https://github.com/CVHub520/X-AnyLabeling)
 - [OSC Documentation](https://www.osc.edu/documentation)
 
----
+## Troubleshooting
 
-**For further help, see the pinned Slack messages or contact your group lead.**
-
----
+- **Modules not found:** Make sure you have loaded CUDA, cuDNN, and ffmpeg modules in every new terminal session.
+- **Missing _C.so:** If you get errors about missing `_C.so`, copy it from `/fs/scratch/PAS3184/baicheng/` to the correct directory.
+- **API errors:** Double-check your `.env` file for correct HuggingFace and Roboflow tokens.
+- **GUI issues:** If the GUI does not display, ensure you have X11 forwarding enabled when using SSH.
+- **PyTorch install issues:** Always use the custom index URL for torch, torchvision, and torchaudio as described above.
