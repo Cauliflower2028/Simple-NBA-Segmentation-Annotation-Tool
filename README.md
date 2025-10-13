@@ -99,4 +99,8 @@ GET HF_TOKEN FROM https://huggingface.co/settings/profile
 GET ROBOFLOW_API_KEY FROM https://app.roboflow.com/settings/api
 
 ## Troubleshooting 
-**The biggest problem is installing SAM2 make sure to request GPU before installing!!**
+**The biggest problem is installing SAM2. Make sure to request a GPU before installing!!**
+
+## Using the Segmentation Tool
+
+See the [demo](https://osumlb.slack.com/files/U09DJRDN33R/F09KNUBP25D/segmentationtool.mp4) video for instructions on using the model
