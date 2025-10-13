@@ -8,7 +8,7 @@ A minimal, user-friendly tool for segmenting basketball players in video clips a
 
 ## Prerequisites 
 
-### 1. Have the Ohio Supercomputer Virtual Machine set up before setup.
+### 1. Have the Ohio Supercomputer Virtual Machine set up before Installation.
 
 See this [documentation](https://docs.google.com/document/d/18efM3UhXIMKOZ-e1weG6fw2CS5-esf2s--cmgjhlOIs/edit?usp=sharing) for setup.
 
