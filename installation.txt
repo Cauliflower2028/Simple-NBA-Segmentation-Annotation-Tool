@@ -7,9 +7,7 @@ conda activate venv
 # UPGRADE PIP
 pip install --upgrade pip
 
-# LOAD CUDA MODULES AND FFMPEG YOU HAVE TO DO THIS EVERY TIME YOU OPEN THE TERMINAL
-module load cuda/12.6.2
-module load cudnn/8.9.7.29-12
+# LOAD FFMPEG YOU HAVE TO DO THIS EVERY TIME YOU OPEN THE TERMINAL
 module load ffmpeg/6.1.1
 
 # Set GCC as the compiler

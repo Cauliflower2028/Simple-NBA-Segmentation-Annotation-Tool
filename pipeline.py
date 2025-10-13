@@ -3,6 +3,7 @@ cv2.namedWindow("priming_window")
 cv2.waitKey(1)
 cv2.destroyWindow("priming_window")
 
+import gc
 import os
 import subprocess
 import json
@@ -64,10 +65,8 @@ def single_mask_to_rle(mask: np.ndarray) -> dict:
     rle['counts'] = rle['counts'].decode('utf-8')
     return rle
 
-def save_annotations_to_json(masks_by_frame: dict, source_video_path: Path, player_name: str, motion_class: str):
-    """Saves the collected masks to a single annotations.json file."""
-    output_dir = source_video_path.parent
-    annotations_path = output_dir / "annotations.json"
+def save_annotations_to_json(masks_by_frame: dict, source_video_path: Path, output_folder: Path, player_name: str, motion_class: str):
+    annotations_path = output_folder / f"{source_video_path.stem}-final.json"
     video_name = source_video_path.name
     
     # Get video properties from the first frame
@@ -121,22 +120,20 @@ def get_initial_detections(source_video_path_str: str):
     detections = detections[np.isin(detections.class_id, PLAYER_CLASS_IDS)]
     return frame, detections
 
-def run_segmentation_pipeline(
+def process_video_and_get_masks(
     source_video_path_str: str,
     output_folder_str: str,
-    player_name: str,
-    motion_class: str,
     selected_player_idx: int,
     first_frame: np.ndarray,
-    detections: sv.Detections,
+    initial_detections: sv.Detections,
     status_callback
 ):
+    detections = initial_detections
     global selected_tracker_id
     status_callback("Status: Initializing...")
     SOURCE_VIDEO_PATH = Path(source_video_path_str)
     OUTPUT_FOLDER = Path(output_folder_str)
-    TARGET_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-mask.mp4"
-    TARGET_VIDEO_COMPRESSED_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-final.mp4"
+    TEMP_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-mask-temp.mp4"
 
     TRACKE_ID = list(range(1, len(detections.class_id) + 1))
     detections.tracker_id = TRACKE_ID
@@ -189,21 +186,43 @@ def run_segmentation_pipeline(
     status_callback("Status: Processing video frames...")
     sv.process_video(
         source_path=SOURCE_VIDEO_PATH,
-        target_path=TARGET_VIDEO_PATH,
+        target_path=TEMP_VIDEO_PATH,
         callback=callback,
         show_progress=True
     )
+    status_callback("Status: Preview ready. Click 'Confirm & Save' to finish.")
+    return all_masks, str(TEMP_VIDEO_PATH)
 
-    ffmpeg_command = [
-        'ffmpeg', '-y', '-loglevel', 'error',
-        '-i', str(TARGET_VIDEO_PATH),
-        '-vcodec', 'mpeg4',   # <-- Use the universal mpeg4 codec
-        '-q:v', '4',         # <-- Use a quality scale (lower is better quality)
-        str(TARGET_VIDEO_COMPRESSED_PATH)
-    ]
-    subprocess.run(ffmpeg_command, check=True)
-    status_callback("Status: Saving annotations...")
-    save_annotations_to_json(all_masks, SOURCE_VIDEO_PATH, player_name, motion_class)
-    os.remove(TARGET_VIDEO_PATH)
-    status_callback("Status: Done!")
-    return str(TARGET_VIDEO_COMPRESSED_PATH)
+def finalize_and_save(
+    temp_video_path_str: str,
+    all_masks: dict,
+    output_folder_str: str,
+    source_video_path_str: str,
+    player_name: str,
+    motion_class: str,
+    status_callback
+):
+    """Compresses the video, saves JSON, and cleans up the temporary file."""
+    try:
+        status_callback("Status: Compressing and saving final files...")
+        TEMP_VIDEO_PATH = Path(temp_video_path_str)
+        OUTPUT_FOLDER = Path(output_folder_str)
+        SOURCE_VIDEO_PATH = Path(source_video_path_str)
+        FINAL_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-final.mp4"
+        
+        ffmpeg_command = [
+            'ffmpeg', '-y', '-loglevel', 'error',
+            '-i', str(TEMP_VIDEO_PATH),
+            '-vcodec', 'mpeg4',   # <-- Use the universal mpeg4 codec
+            '-q:v', '4',         # <-- Use a quality scale (lower is better quality)
+            str(FINAL_VIDEO_PATH)
+        ]
+        subprocess.run(ffmpeg_command, check=True)
+        status_callback("Status: Saving annotations...")
+        save_annotations_to_json(all_masks, FINAL_VIDEO_PATH, OUTPUT_FOLDER, player_name, motion_class)
+        os.remove(TEMP_VIDEO_PATH)
+        status_callback("Status: Done!")
+        return str(FINAL_VIDEO_PATH)
+    except Exception as e:
+        status_callback(f"ERROR during save: {e}")
+        return None
