@@ -106,11 +106,6 @@ export CXX=g++
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126  
 ```
 
-# 6. Install other dependencies
-```bash
-pip install -r requirements.txt
-```
-
 ### 7. FOR INSTALLING SAM2 REAL-TIME - RUN THE FOLLOWING COMMANDS  
 **IMPORTANT**: MAKE SURE TO REQUEST GPU BEFORE INSTALLING OR IT WILL NOT WORK!
 ```bash
