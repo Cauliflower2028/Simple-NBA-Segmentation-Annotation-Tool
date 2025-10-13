@@ -1,7 +1,10 @@
-NBA-Segmentation-Annotation-Tool
+# NBA-Segmentation-Annotation-Tool
 
 A minimal, user-friendly tool for segmenting basketball players in video clips and generating annotation masks, designed for research and annotation workflows.  
  **Supports GPU acceleration and is intended for use on OSC (Ohio Supercomputer Center) Linux clusters.**
+
+ This project builds upon techniques described in Roboflow’s guide:  
+[Identify Basketball Players with AI](https://blog.roboflow.com/identify-basketball-players/)
 
 ---
 
