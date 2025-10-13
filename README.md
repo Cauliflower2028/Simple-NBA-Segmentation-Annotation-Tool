@@ -21,6 +21,7 @@ pip install pycocotools
 pip install Pillow  
 
 ### FOR INSTALLING SAM2 REAL-TIME - RUN THE FOLLOWING COMMANDS  
+### !MAKE SURE TO REQUEST GPU BEFORE INSTALLING OR IT WILL NOT WORK!
 git clone https://github.com/Gy920/segment-anything-2-real-time.git    
 cd ./segment-anything-2-real-time  
 pip install -e .  
