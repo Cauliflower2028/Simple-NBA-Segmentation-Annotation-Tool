@@ -98,4 +98,4 @@ GET ROBOFLOW_API_KEY FROM https://app.roboflow.com/settings/api
 
 ## Using the Segmentation Tool
 
-See the [demo](https://osumlb.slack.com/files/U09DJRDN33R/F09KNUBP25D/segmentationtool.mp4) video for instructions on using the model
+See the [demo](https://osumlb.slack.com/files/U09DJRATW5D/F09L55E61S7/improved_tool_demo.mp4) video for instructions on using the model
