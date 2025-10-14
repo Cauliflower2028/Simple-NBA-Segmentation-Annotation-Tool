@@ -3,6 +3,7 @@ from tkinter import filedialog, ttk
 import threading
 import os
 import sys
+import gc
 import subprocess
 from pathlib import Path
 import cv2
@@ -91,7 +92,7 @@ class SegmentationApp:
         ttk.Entry(top_frame, textvariable=self.motion_class).grid(row=1, column=3, sticky='w')
         self.start_button = ttk.Button(top_frame, text="Start Segmentation", command=self.start_full_process)
         self.start_button.grid(row=0, column=4, rowspan=2, padx=20, ipady=10)
-        self.reset_button = ttk.Button(top_frame, text="Restart Application", command=self.reset_models)
+        self.reset_button = ttk.Button(top_frame, text="Reset For New Video", command=self.reset_state)
         self.reset_button.grid(row=0, column=5, rowspan=2, padx=5)
         top_frame.columnconfigure(1, weight=1)
 
@@ -104,24 +105,50 @@ class SegmentationApp:
         self.replay_og_button = ttk.Button(status_frame, text="Replay Original", state=tk.DISABLED, command=self.original_video_player.replay)
         self.replay_og_button.pack(side=tk.RIGHT, padx=5)
 
-    def reset_models(self):
-        """This is the 'scuffed' but effective method: restart the entire application."""
-        self.update_status("Status: Restarting application for a clean state...")
-        
-        # Clean up any temporary video files before exiting
+    # REPLACE the entire 'reset_models' method with this:
+    def reset_state(self):
+        """Clears the application state to prepare for a new video."""
+        self.update_status("Status: Resetting. Ready for a new video.")
+
+        # Clean up any leftover temp video file
         if self.temp_video_path and os.path.exists(self.temp_video_path):
             try:
                 os.remove(self.temp_video_path)
                 print(f"Cleaned up temporary file: {self.temp_video_path}")
-            except OSError as e: 
-                print(f"Error removing temporary file during restart: {e}")
+            except OSError as e:
+                print(f"Error removing temp file during reset: {e}")
 
-        # Get the path to the python executable and the script's arguments
-        python = sys.executable
-        args = sys.argv
-        
-        # Replace the current process with a new one
-        os.execv(python, [python] + args)
+        # Clear all state-holding variables
+        self.input_path.set("")
+        self.first_frame = None
+        self.initial_detections = None
+        self.all_masks = None
+        self.temp_video_path = None
+        self.selected_player_idx = -1
+
+        # Stop video players and release resources
+        if self.original_video_player.cap:
+            self.original_video_player.cap.release()
+            self.original_video_player.cap = None
+        if self.segmented_video_player.cap:
+            self.segmented_video_player.cap.release()
+            self.segmented_video_player.cap = None
+
+        # Create a blank image to clear the video display labels
+        blank_img = ImageTk.PhotoImage(Image.new('RGB', (1, 1)))
+        self.original_video_player.label.configure(image=blank_img)
+        self.original_video_player.label.imgtk = blank_img
+        self.segmented_video_player.label.configure(image=blank_img)
+        self.segmented_video_player.label.imgtk = blank_img
+
+        # Reset button states
+        self.save_button.config(state=tk.DISABLED)
+        self.replay_seg_button.config(state=tk.DISABLED)
+        self.replay_og_button.config(state=tk.DISABLED)
+        self.start_button.config(state=tk.NORMAL)
+
+        # Force Python's garbage collector to run
+        gc.collect()
 
     def update_status(self, message): self.root.after(0, lambda: self.status.set(message))
 

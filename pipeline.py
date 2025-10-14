@@ -24,7 +24,6 @@ PLAYER_CLASS_IDS = [3, 4, 5, 6, 7]
 
 config_file = "configs/sam2.1/sam2.1_hiera_l.yaml"
 checkpoint_file = HOME / "segment-anything-2-real-time" / "checkpoints" / "sam2.1_hiera_large.pt"
-predictor = build_sam2_camera_predictor(config_file, str(checkpoint_file))
 
 selected_tracker_id = None
 
@@ -128,6 +127,9 @@ def process_video_and_get_masks(
     initial_detections: sv.Detections,
     status_callback
 ):
+    status_callback("Status: Loading segmentation model...")
+    predictor = build_sam2_camera_predictor(config_file, str(checkpoint_file))
+
     detections = initial_detections
     global selected_tracker_id
     status_callback("Status: Initializing...")
@@ -151,7 +153,11 @@ def process_video_and_get_masks(
             )
 
     all_masks = {}
+    cap = cv2.VideoCapture(str(SOURCE_VIDEO_PATH))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
     def callback(frame: np.ndarray, index: int) -> np.ndarray:
+        status_callback(f"Status: Processing frame {index + 1}/{total_frames}")
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
             tracker_ids, mask_logits = predictor.track(frame)
             tracker_ids = np.array(tracker_ids)
@@ -183,13 +189,17 @@ def process_video_and_get_masks(
 
             return output_frame
 
-    status_callback("Status: Processing video frames...")
     sv.process_video(
         source_path=SOURCE_VIDEO_PATH,
         target_path=TEMP_VIDEO_PATH,
         callback=callback,
-        show_progress=True
+        show_progress=False
     )
+
+    del predictor
+    torch.cuda.empty_cache()
+    gc.collect()
+
     status_callback("Status: Preview ready. Click 'Confirm & Save' to finish.")
     return all_masks, str(TEMP_VIDEO_PATH)
 
