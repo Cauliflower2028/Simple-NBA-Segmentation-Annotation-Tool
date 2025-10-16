@@ -289,6 +289,10 @@ if __name__ == "__main__":
     try:
         from dotenv import load_dotenv
         load_dotenv()
+        os.environ["HF_TOKEN"] = os.getenv("HF_TOKEN")
+        os.environ["ROBOFLOW_API_KEY"] = os.getenv("ROBOFLOW_API_KEY")
+        os.environ["ONNXRUNTIME_EXECUTION_PROVIDERS"] = "[CUDAExecutionProvider]"
+        os.environ["MODEL_CACHE_DIR"] = "./cache"
     except ImportError:
         print("dotenv library not found, skipping .env file loading.")
     root = tk.Tk()
