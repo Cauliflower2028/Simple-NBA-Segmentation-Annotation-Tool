@@ -67,7 +67,7 @@ def single_mask_to_rle(mask: np.ndarray) -> dict:
     return rle
 
 def save_annotations_to_json(masks_by_frame: dict, source_video_path: Path, output_folder: Path, player_name: str, motion_class: str):
-    annotations_path = output_folder / f"{source_video_path.stem}-final.json"
+    annotations_path = output_folder / f"{source_video_path.stem}.json"
     video_name = source_video_path.name
     
     # Get video properties from the first frame
@@ -254,7 +254,7 @@ def finalize_and_save(
         TEMP_VIDEO_PATH = Path(temp_video_path_str)
         OUTPUT_FOLDER = Path(output_folder_str)
         SOURCE_VIDEO_PATH = Path(source_video_path_str)
-        FINAL_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-final.mp4"
+        FINAL_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}.mp4"
         
         ffmpeg_command = [
             'ffmpeg', '-y', '-loglevel', 'error',
