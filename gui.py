@@ -4,13 +4,14 @@ import threading
 import os
 import sys
 import gc
+import numpy as np
 import subprocess
 from pathlib import Path
 import cv2
 from PIL import Image, ImageTk
 
 # Import the new functions from our backend
-from pipeline import get_initial_detections, process_video_and_get_masks, finalize_and_save
+from pipeline import PLAYER_CLASS_IDS, get_initial_detections, process_video_and_get_masks, finalize_and_save
 
 class VideoPlayer:
     def __init__(self, label: ttk.Label, root: tk.Tk):
@@ -182,20 +183,24 @@ class SegmentationApp:
         if self.selected_player_idx != -1:
             self.start_background_thread()
 
+
     def select_player_with_cv2(self):
         selection_result = []
+        player_detections = self.initial_detections[np.isin(self.initial_detections.class_id, PLAYER_CLASS_IDS)]
         annotated_frame = self.first_frame.copy()
         window_name = "Click Player to Track (then press any key)"
-        for i, xyxy in enumerate(self.initial_detections.xyxy):
+        for i, xyxy in enumerate(player_detections.xyxy):
             cv2.rectangle(annotated_frame, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
             cv2.putText(annotated_frame, str(i), (int(xyxy[0]), int(xyxy[1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
         def mouse_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
-                for i, xyxy in enumerate(self.initial_detections.xyxy):
+                # Check clicks against the players-only list
+                for i, xyxy in enumerate(player_detections.xyxy):
                     if xyxy[0] < x < xyxy[2] and xyxy[1] < y < xyxy[3]:
                         selection_result.append(i)
                         temp_frame = self.first_frame.copy()
-                        for j, box in enumerate(self.initial_detections.xyxy):
+                        # Highlight the selected player from the players-only list
+                        for j, box in enumerate(player_detections.xyxy):
                             color = (0, 255, 0) if i == j else (0, 0, 255)
                             cv2.rectangle(temp_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), color, 4 if i == j else 2)
                         cv2.imshow(window_name, temp_frame)

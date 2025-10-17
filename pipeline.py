@@ -21,6 +21,8 @@ PLAYER_DETECTION_MODEL_CONFIDENCE = 0.4
 PLAYER_DETECTION_MODEL_IOU_THRESHOLD = 0.9
 PLAYER_DETECTION_MODEL = get_model(model_id=PLAYER_DETECTION_MODEL_ID)
 PLAYER_CLASS_IDS = [3, 4, 5, 6, 7]
+BASKETBALL_CLASS_ID = 0
+PROXIMITY_THRESHOLD = 100
 
 config_file = "configs/sam2.1/sam2.1_hiera_l.yaml"
 checkpoint_file = HOME / "segment-anything-2-real-time" / "checkpoints" / "sam2.1_hiera_large.pt"
@@ -116,7 +118,8 @@ def get_initial_detections(source_video_path_str: str):
 
     result = PLAYER_DETECTION_MODEL.infer(frame, confidence=PLAYER_DETECTION_MODEL_CONFIDENCE, iou_threshold=PLAYER_DETECTION_MODEL_IOU_THRESHOLD)[0]
     detections = sv.Detections.from_inference(result)
-    detections = detections[np.isin(detections.class_id, PLAYER_CLASS_IDS)]
+    valid_class_ids = PLAYER_CLASS_IDS + [BASKETBALL_CLASS_ID]
+    detections = detections[np.isin(detections.class_id, valid_class_ids)]
     return frame, detections
 
 def process_video_and_get_masks(
@@ -137,9 +140,19 @@ def process_video_and_get_masks(
     OUTPUT_FOLDER = Path(output_folder_str)
     TEMP_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-mask-temp.mp4"
 
-    TRACKE_ID = list(range(1, len(detections.class_id) + 1))
+    TRACKE_ID = np.arange(1, len(detections.class_id) + 1)
     detections.tracker_id = TRACKE_ID
-    selected_tracker_id = detections.tracker_id[selected_player_idx]
+
+    player_detections = detections[np.isin(detections.class_id, PLAYER_CLASS_IDS)]
+    if selected_player_idx >= len(player_detections.tracker_id):
+        raise IndexError("Selected player index is out of bounds.")
+    selected_tracker_id = player_detections.tracker_id[selected_player_idx]
+
+    is_basketball_mask = (detections.class_id == BASKETBALL_CLASS_ID)
+    ball_detections = detections[is_basketball_mask]
+    ball_tracker_ids = ball_detections.tracker_id
+    ball_tracker_ids_set = set(ball_tracker_ids)
+
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
         predictor.load_first_frame(first_frame)
 
@@ -177,15 +190,38 @@ def process_video_and_get_masks(
                 tracker_id=tracker_ids
             )
 
-            # Filter ONLY the selected player for visualization
-            detections_to_show = detections[detections.tracker_id == selected_tracker_id]
+            # Filter ONLY the selected player or the basketball for visualization
+            tracker_ids_to_show = [selected_tracker_id] + [tid for tid in tracker_ids if tid in ball_tracker_ids_set]
+            detections_to_show = detections[np.isin(detections.tracker_id, tracker_ids_to_show)]
 
             output_frame = np.zeros_like(frame)
-            if len(detections_to_show.mask) > 0:
-                player_mask = detections_to_show.mask[0]
-                output_frame[player_mask] = (255, 255, 255)
+            selected_player_mask_idx = np.where(detections_to_show.tracker_id == selected_tracker_id)[0]
 
-            all_masks[index] = player_mask
+            if len(selected_player_mask_idx) > 0:
+                player_mask = detections_to_show.mask[selected_player_mask_idx[0]]
+                output_frame[player_mask] = (255, 255, 255)
+                
+                # Add ball mask(s)
+                for i, tracker_id in enumerate(detections_to_show.tracker_id):
+                    if tracker_id in ball_tracker_ids_set:
+                        ball_mask = detections_to_show.mask[i]
+                        output_frame[ball_mask] = (255, 255, 255)
+                
+                # Keep only largest connected component
+                output_gray = cv2.cvtColor(output_frame, cv2.COLOR_BGR2GRAY)
+                num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(output_gray, connectivity=8)
+                
+                if num_labels > 2:  # Multiple white regions exist
+                    largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+                    output_frame = np.zeros_like(frame)
+                    output_frame[labels == largest_label] = (255, 255, 255)
+                    all_masks[index] = (labels == largest_label)  # This creates a 2D boolean array
+                else:  # Only one region (player + ball still connected)
+                    # Get combined mask from output_frame for consistency
+                    combined_mask = (output_gray > 0)  # Convert back to boolean
+                    all_masks[index] = combined_mask
+            else:
+                all_masks[index] = np.zeros((frame.shape[0], frame.shape[1]), dtype=bool)
 
             return output_frame
 
