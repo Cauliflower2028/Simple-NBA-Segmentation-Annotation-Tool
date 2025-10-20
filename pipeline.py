@@ -5,6 +5,7 @@ cv2.destroyWindow("priming_window")
 
 import gc
 import os
+import copy
 import subprocess
 import json
 from pathlib import Path
@@ -17,8 +18,10 @@ from sam2.build_sam import build_sam2_camera_predictor
 HOME = Path.cwd()
 
 PLAYER_DETECTION_MODEL_ID = "basketball-player-detection-3-ycjdo/4"
-PLAYER_DETECTION_MODEL_CONFIDENCE = 0.4
+PLAYER_DETECTION_MODEL_CONFIDENCE = 0.15
 PLAYER_DETECTION_MODEL_IOU_THRESHOLD = 0.9
+BALL_CONFIDENCE = 0.10
+BALL_IOU_THRESHOLD = 0.9
 PLAYER_DETECTION_MODEL = get_model(model_id=PLAYER_DETECTION_MODEL_ID)
 PLAYER_CLASS_IDS = [3, 4, 5, 6, 7]
 BASKETBALL_CLASS_ID = 0
@@ -117,10 +120,41 @@ def get_initial_detections(source_video_path_str: str):
     frame = next(frame_generator)
 
     result = PLAYER_DETECTION_MODEL.infer(frame, confidence=PLAYER_DETECTION_MODEL_CONFIDENCE, iou_threshold=PLAYER_DETECTION_MODEL_IOU_THRESHOLD)[0]
-    detections = sv.Detections.from_inference(result)
-    valid_class_ids = PLAYER_CLASS_IDS + [BASKETBALL_CLASS_ID]
-    detections = detections[np.isin(detections.class_id, valid_class_ids)]
+    player_detections = sv.Detections.from_inference(result)
+    player_detections = player_detections[np.isin(player_detections.class_id, PLAYER_CLASS_IDS)]
+    
+    # Detect ball with lower confidence
+    result_ball = PLAYER_DETECTION_MODEL.infer(frame, confidence=BALL_CONFIDENCE, iou_threshold=BALL_IOU_THRESHOLD)[0]
+    ball_detections = sv.Detections.from_inference(result_ball)
+    ball_detections = ball_detections[ball_detections.class_id == BASKETBALL_CLASS_ID]
+    
+    # Combine detections
+    detections = sv.Detections.merge([player_detections, ball_detections])
+
     return frame, detections
+
+def find_ball_in_video(source_video_path_str: str, max_frames: int = 30):
+    """Scan first N frames to find the ball. Returns (frame_idx, bbox, frame) or (None, None, None)"""
+    cap = cv2.VideoCapture(source_video_path_str)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    max_search = min(max_frames, total_frames)
+    
+    for frame_idx in range(0, max_search):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        result = PLAYER_DETECTION_MODEL.infer(frame, confidence=BALL_CONFIDENCE, iou_threshold=BALL_IOU_THRESHOLD)[0]
+        ball_detections = sv.Detections.from_inference(result)
+        ball_detections = ball_detections[ball_detections.class_id == BASKETBALL_CLASS_ID]
+        
+        if len(ball_detections) > 0:
+            cap.release()
+            return frame_idx, ball_detections.xyxy[0], frame
+    
+    cap.release()
+    return None, None, None
 
 def process_video_and_get_masks(
     source_video_path_str: str,
@@ -152,6 +186,11 @@ def process_video_and_get_masks(
     ball_detections = detections[is_basketball_mask]
     ball_tracker_ids = ball_detections.tracker_id
     ball_tracker_ids_set = set(ball_tracker_ids)
+    
+    ball_to_add_frame_idx = None
+    ball_to_add_bbox = None
+    ball_to_add_tracker_id = None
+    last_known_detections = None
 
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
         predictor.load_first_frame(first_frame)
@@ -164,13 +203,61 @@ def process_video_and_get_masks(
                 obj_id=tracker_id,
                 bbox=xyxy
             )
-
+        
+        if len(ball_tracker_ids_set) == 0:
+            status_callback("Status: Ball not in first frame, scanning video...")
+            ball_frame_idx, ball_bbox, ball_frame = find_ball_in_video(source_video_path_str, max_frames=30)
+            
+            if ball_frame_idx is not None:
+                status_callback(f"Status: Ball found at frame {ball_frame_idx}! Will add during processing...")
+                ball_to_add_frame_idx = ball_frame_idx
+                ball_to_add_bbox = ball_bbox
+                ball_to_add_tracker_id = max(detections.tracker_id) + 1
+            else:
+                status_callback("Status: No ball found in first 30 frames. Proceeding without ball tracking.")
+    
     all_masks = {}
     cap = cv2.VideoCapture(str(SOURCE_VIDEO_PATH))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.release()
-    def callback(frame: np.ndarray, index: int) -> np.ndarray:
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(str(TEMP_VIDEO_PATH), fourcc, fps, (width, height))
+
+    for index in range(total_frames):
         status_callback(f"Status: Processing frame {index + 1}/{total_frames}")
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # --- The Core Reset Logic ---
+        if ball_to_add_frame_idx is not None and index == ball_to_add_frame_idx:
+            status_callback(f"Status: Resetting tracker to add ball at frame {index}...")
+            with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+                # 1. Reset the tracker's state
+                predictor.reset_state()
+                # 2. Load the current frame as the new starting point
+                predictor.load_first_frame(frame)
+                
+                # 3. Re-add prompts for all previously tracked players using their last known positions
+                if last_known_detections is not None:
+                    for xyxy, tracker_id in zip(last_known_detections.xyxy, last_known_detections.tracker_id):
+                        predictor.add_new_prompt(
+                            frame_idx=0, # It's frame 0 for the *new* tracking session
+                            obj_id=tracker_id,
+                            bbox=np.array([xyxy])
+                        )
+                
+                # 4. Add the new ball prompt
+                predictor.add_new_prompt(
+                    frame_idx=0, # Also frame 0 for the new session
+                    obj_id=ball_to_add_tracker_id,
+                    bbox=np.array([ball_to_add_bbox])
+                )
+                ball_tracker_ids_set.add(ball_to_add_tracker_id)
+        
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
             tracker_ids, mask_logits = predictor.track(frame)
             tracker_ids = np.array(tracker_ids)
@@ -189,6 +276,7 @@ def process_video_and_get_masks(
                 mask=masks,
                 tracker_id=tracker_ids
             )
+            last_known_detections = copy.deepcopy(detections)
 
             # Filter ONLY the selected player or the basketball for visualization
             tracker_ids_to_show = [selected_tracker_id] + [tid for tid in tracker_ids if tid in ball_tracker_ids_set]
@@ -223,15 +311,11 @@ def process_video_and_get_masks(
             else:
                 all_masks[index] = np.zeros((frame.shape[0], frame.shape[1]), dtype=bool)
 
-            return output_frame
+        writer.write(output_frame)
 
-    sv.process_video(
-        source_path=SOURCE_VIDEO_PATH,
-        target_path=TEMP_VIDEO_PATH,
-        callback=callback,
-        show_progress=False
-    )
-
+    writer.release()
+    cap.release()
+    
     del predictor
     torch.cuda.empty_cache()
     gc.collect()
