@@ -188,7 +188,7 @@ class SegmentationApp:
         selection_result = []
         player_detections = self.initial_detections[np.isin(self.initial_detections.class_id, PLAYER_CLASS_IDS)]
         annotated_frame = self.first_frame.copy()
-        window_name = "Click Player to Track (then press any key)"
+        window_name = "Click Player to Track (then press ENTER to confirm)"
         for i, xyxy in enumerate(player_detections.xyxy):
             cv2.rectangle(annotated_frame, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
             cv2.putText(annotated_frame, str(i), (int(xyxy[0]), int(xyxy[1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
@@ -207,7 +207,8 @@ class SegmentationApp:
                         break
         cv2.imshow(window_name, annotated_frame)
         cv2.setMouseCallback(window_name, mouse_callback)
-        cv2.waitKey(0)
+        while cv2.waitKey(1) != 13:
+            pass
         cv2.destroyAllWindows()
         if selection_result:
             self.selected_player_idx = selection_result[-1]
