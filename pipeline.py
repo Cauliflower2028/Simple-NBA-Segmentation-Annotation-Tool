@@ -360,6 +360,7 @@ def finalize_and_save(
     status_callback
 ):
     """Compresses the video, saves JSON, and cleans up the temporary file."""
+    all_masks = None
     try:
         status_callback("Status: Compressing and saving final files...")
         TEMP_VIDEO_PATH = Path(temp_video_path_str)
@@ -384,7 +385,6 @@ def finalize_and_save(
         
         save_annotations_to_json(all_masks, FINAL_VIDEO_PATH, OUTPUT_FOLDER, player_name, motion_class)
 
-        del all_masks
         os.remove(TEMP_VIDEO_PATH)
         os.remove(TEMP_MASKS_JSON)  
 
