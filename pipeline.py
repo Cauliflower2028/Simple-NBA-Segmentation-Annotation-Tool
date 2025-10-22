@@ -8,6 +8,7 @@ import os
 import copy
 import subprocess
 import json
+import time
 from pathlib import Path
 import numpy as np
 import torch
@@ -315,17 +316,43 @@ def process_video_and_get_masks(
 
     writer.release()
     cap.release()
-    
-    del predictor
-    torch.cuda.empty_cache()
+
+    status_callback("Status: Saving annotations to JSON...")
+    SOURCE_VIDEO_PATH = Path(source_video_path_str)
+    OUTPUT_FOLDER = Path(output_folder_str)
+    TEMP_MASKS_JSON = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}-masks-temp.json"
+
+    import pickle
+    with open(TEMP_MASKS_JSON, 'wb') as f:
+        pickle.dump(all_masks, f)
+
+    status_callback("Status: Clearing masks from memory...")
+    del all_masks
     gc.collect()
+    
+    try:
+        if hasattr(predictor, 'reset_state'):
+            predictor.reset_state()
+        
+        del predictor
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
+        gc.collect()
+        time.sleep(1)
+        
+    except Exception as e:
+        status_callback(f"Warning during cleanup: {e}")
+    
 
     status_callback("Status: Preview ready. Click 'Confirm & Save' to finish.")
-    return all_masks, str(TEMP_VIDEO_PATH)
+    return str(TEMP_MASKS_JSON), str(TEMP_VIDEO_PATH)  
 
 def finalize_and_save(
     temp_video_path_str: str,
-    all_masks: dict,
+    temp_masks_json_str: str,  
     output_folder_str: str,
     source_video_path_str: str,
     player_name: str,
@@ -336,6 +363,7 @@ def finalize_and_save(
     try:
         status_callback("Status: Compressing and saving final files...")
         TEMP_VIDEO_PATH = Path(temp_video_path_str)
+        TEMP_MASKS_JSON = Path(temp_masks_json_str)
         OUTPUT_FOLDER = Path(output_folder_str)
         SOURCE_VIDEO_PATH = Path(source_video_path_str)
         FINAL_VIDEO_PATH = OUTPUT_FOLDER / f"{SOURCE_VIDEO_PATH.stem}.mp4"
@@ -343,16 +371,36 @@ def finalize_and_save(
         ffmpeg_command = [
             'ffmpeg', '-y', '-loglevel', 'error',
             '-i', str(TEMP_VIDEO_PATH),
-            '-vcodec', 'mpeg4',   # <-- Use the universal mpeg4 codec
-            '-q:v', '4',         # <-- Use a quality scale (lower is better quality)
+            '-vcodec', 'mpeg4',
+            '-q:v', '4',
             str(FINAL_VIDEO_PATH)
         ]
         subprocess.run(ffmpeg_command, check=True)
-        status_callback("Status: Saving annotations...")
+
+        status_callback("Status: Loading masks and saving annotations...")
+        import pickle
+        with open(TEMP_MASKS_JSON, 'rb') as f:
+            all_masks = pickle.load(f)
+        
         save_annotations_to_json(all_masks, FINAL_VIDEO_PATH, OUTPUT_FOLDER, player_name, motion_class)
+
+        del all_masks
         os.remove(TEMP_VIDEO_PATH)
+        os.remove(TEMP_MASKS_JSON)  
+
+        status_callback("Status: Cleaning up memory...")
+        del all_masks
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        time.sleep(1)
+        
         status_callback("Status: Done!")
         return str(FINAL_VIDEO_PATH)
     except Exception as e:
         status_callback(f"ERROR during save: {e}")
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
         return None

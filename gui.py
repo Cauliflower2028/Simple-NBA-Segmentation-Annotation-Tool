@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, ttk, messagebox
 import threading
 import os
 import sys
@@ -63,7 +63,7 @@ class SegmentationApp:
         self.player_name, self.motion_class = tk.StringVar(value="Bam Adebayo"), tk.StringVar(value="freethrow")
         self.status = tk.StringVar(value="Status: Ready")
         self.first_frame, self.initial_detections = None, None
-        self.all_masks, self.temp_video_path = None, None
+        self.temp_masks_json_path, self.temp_video_path = None, None  # 改为存储JSON文件路径
         self.selected_player_idx = -1
 
         # --- Layout ---
@@ -83,10 +83,14 @@ class SegmentationApp:
         status_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
         # --- Controls ---
-        ttk.Button(top_frame, text="Select Input Video", command=self.select_input).grid(row=0, column=0, sticky='w')
-        ttk.Label(top_frame, textvariable=self.input_path, relief="sunken").grid(row=0, column=1, sticky='we')
-        ttk.Button(top_frame, text="Select Output Folder", command=self.select_output).grid(row=1, column=0, sticky='w')
-        ttk.Label(top_frame, textvariable=self.output_path, relief="sunken").grid(row=1, column=1, sticky='we')
+        ttk.Button(top_frame, text="Browse Input...", command=self.select_input).grid(row=0, column=0, sticky='w')
+        self.input_entry = ttk.Entry(top_frame, textvariable=self.input_path)
+        self.input_entry.grid(row=0, column=1, sticky='we')
+        self.input_entry.bind("<Return>", lambda e: self.on_input_entry_enter())
+        ttk.Button(top_frame, text="Browse Output...", command=self.select_output).grid(row=1, column=0, sticky='w')
+        self.output_entry = ttk.Entry(top_frame, textvariable=self.output_path)
+        self.output_entry.grid(row=1, column=1, sticky='we')
+        self.output_entry.bind("<Return>", lambda e: self.on_output_entry_enter())
         ttk.Label(top_frame, text="Player Name:").grid(row=0, column=2, sticky='w', padx=(10,0))
         ttk.Entry(top_frame, textvariable=self.player_name).grid(row=0, column=3, sticky='w')
         ttk.Label(top_frame, text="Motion Class:").grid(row=1, column=2, sticky='w', padx=(10,0))
@@ -96,6 +100,9 @@ class SegmentationApp:
         self.reset_button = ttk.Button(top_frame, text="Reset For New Video", command=self.reset_state)
         self.reset_button.grid(row=0, column=5, rowspan=2, padx=5)
         top_frame.columnconfigure(1, weight=1)
+
+        # Make entries stretch across available space
+        top_frame.columnconfigure(3, weight=0)
 
         # --- Status Bar ---
         ttk.Label(status_frame, textvariable=self.status).pack(side=tk.LEFT)
@@ -123,7 +130,7 @@ class SegmentationApp:
         self.input_path.set("")
         self.first_frame = None
         self.initial_detections = None
-        self.all_masks = None
+        self.temp_masks_json_path = None  # 改为清理JSON路径
         self.temp_video_path = None
         self.selected_player_idx = -1
 
@@ -165,6 +172,39 @@ class SegmentationApp:
         path = filedialog.askdirectory()
         if path: self.output_path.set(path)
 
+    def on_input_entry_enter(self):
+        """Called when user types a path into the input entry and presses Enter."""
+        path = self.input_path.get().strip()
+        if not path:
+            messagebox.showwarning("Input Path", "Please enter a path to an input video.")
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Input Path", f"The path does not exist: {path}")
+            return
+        # Try to load the video into the player
+        try:
+            self.replay_og_button.config(state=tk.NORMAL)
+            self.original_video_player.load(path)
+            self.update_status("Status: Video loaded from typed path. Ready to start segmentation.")
+        except Exception as e:
+            messagebox.showerror("Load Error", f"Failed to load video: {e}")
+
+    def on_output_entry_enter(self):
+        """Called when user types a path into the output entry and presses Enter."""
+        path = self.output_path.get().strip()
+        if not path:
+            messagebox.showwarning("Output Path", "Please enter a path to an output folder.")
+            return
+        if not os.path.exists(path):
+            try:
+                os.makedirs(path, exist_ok=True)
+                self.update_status(f"Status: Created output folder: {path}")
+            except Exception as e:
+                messagebox.showerror("Output Path", f"Unable to create folder: {e}")
+                return
+        else:
+            self.update_status(f"Status: Using output folder: {path}")
+
     def start_full_process(self):
         if not self.input_path.get() or not self.output_path.get():
             self.update_status("Status: Please select input and output paths first.")
@@ -188,7 +228,7 @@ class SegmentationApp:
         selection_result = []
         player_detections = self.initial_detections[np.isin(self.initial_detections.class_id, PLAYER_CLASS_IDS)]
         annotated_frame = self.first_frame.copy()
-        window_name = "Click Player to Track (then press ENTER to confirm)"
+        window_name = "Click Player to Track (then press any key)"
         for i, xyxy in enumerate(player_detections.xyxy):
             cv2.rectangle(annotated_frame, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
             cv2.putText(annotated_frame, str(i), (int(xyxy[0]), int(xyxy[1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
@@ -207,8 +247,7 @@ class SegmentationApp:
                         break
         cv2.imshow(window_name, annotated_frame)
         cv2.setMouseCallback(window_name, mouse_callback)
-        while cv2.waitKey(1) != 13:
-            pass
+        cv2.waitKey(0)
         cv2.destroyAllWindows()
         if selection_result:
             self.selected_player_idx = selection_result[-1]
@@ -230,7 +269,7 @@ class SegmentationApp:
     def run_segmentation_in_background(self):
         """This is the function that the background thread actually runs."""
         # This calls the main processing function from pipeline.py
-        self.all_masks, self.temp_video_path = process_video_and_get_masks(
+        self.temp_masks_json_path, self.temp_video_path = process_video_and_get_masks(  
             source_video_path_str=self.input_path.get(),
             output_folder_str=self.output_path.get(),
             selected_player_idx=self.selected_player_idx,
@@ -267,9 +306,12 @@ class SegmentationApp:
 
     def save_in_background(self):
         final_path = finalize_and_save(
-            temp_video_path_str=self.temp_video_path, all_masks=self.all_masks,
-            output_folder_str=self.output_path.get(), source_video_path_str=self.input_path.get(),
-            player_name=self.player_name.get(), motion_class=self.motion_class.get(),
+            temp_video_path_str=self.temp_video_path, 
+            temp_masks_json_str=self.temp_masks_json_path,  # 传递JSON文件路径
+            output_folder_str=self.output_path.get(), 
+            source_video_path_str=self.input_path.get(),
+            player_name=self.player_name.get(), 
+            motion_class=self.motion_class.get(),
             status_callback=self.update_status
         )
         def on_save_finish():
