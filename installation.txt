@@ -24,7 +24,8 @@ pip install Pillow
 
 # FOR INSTALLING SAM2 REAL-TIME - RUN THE FOLLOWING COMMANDS
 ## MAKE SURE YOU HAVE GPU ENABLED WHEN YOU DO THIS
-## IF YOU HAVE ISSUES WITH FLASHATTN GET A PRECOMPILED WHEEL VERSION FROM https://github.com/Dao-AILab/flash-attention/releases/tag/v2.8.3
+## IF YOU HAVE ISSUES WITH FLASHATTN GET A PRECOMPILED WHEEL VERSION MATCHING WITH YOUR PYTHON/PYTORCH VERSION FROM https://github.com/Dao-AILab/flash-attention/releases/tag/v2.8.3
+## AFTER YOU GET THE PRECOMPILED WHEEL YOU CAN 'pip install ./whlfile' TO FIX
 git clone https://github.com/Gy920/segment-anything-2-real-time.git
 cd ./segment-anything-2-real-time
 pip install -e .
