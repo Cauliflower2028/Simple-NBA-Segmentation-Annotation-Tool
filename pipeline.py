@@ -45,6 +45,11 @@ def filter_segments_by_distance(mask: np.ndarray, distance_threshold: float = 30
         np.ndarray: Boolean mask after filtering.
     """
     assert mask.dtype == bool, "Input mask must be boolean."
+    
+    # Handle 1D masks (when only one player is detected)
+    if mask.ndim == 1:
+        return mask.copy()
+    
     mask_uint8 = mask.astype(np.uint8)
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask_uint8, connectivity=8)
     if num_labels <= 1:
@@ -263,13 +268,32 @@ def process_video_and_get_masks(
             tracker_ids, mask_logits = predictor.track(frame)
             tracker_ids = np.array(tracker_ids)
             masks = (mask_logits > 0.0).cpu().numpy()
-            masks = np.squeeze(masks).astype(bool)
-
-            masks = np.array([
-                filter_segments_by_distance(mask, distance_threshold=300)
-                for mask
-                in masks
-            ])
+            
+            # Handle different mask shapes robustly
+            if masks.ndim == 4:
+                # 4D array: (num_objects, 1, height, width)
+                processed_masks = []
+                for i in range(masks.shape[0]):
+                    mask = masks[i, 0].astype(bool)
+                    processed_masks.append(filter_segments_by_distance(mask, distance_threshold=300))
+            elif masks.ndim == 3:
+                # 3D array: (num_objects, height, width)
+                processed_masks = []
+                for i in range(masks.shape[0]):
+                    mask = masks[i].astype(bool)
+                    processed_masks.append(filter_segments_by_distance(mask, distance_threshold=300))
+            elif masks.ndim == 2:
+                # 2D array: single mask (height, width)
+                processed_masks = [filter_segments_by_distance(masks.astype(bool), distance_threshold=300)]
+            else:
+                # Fallback: try to squeeze and handle
+                masks = np.squeeze(masks).astype(bool)
+                if masks.ndim == 2:
+                    processed_masks = [filter_segments_by_distance(masks, distance_threshold=300)]
+                else:
+                    processed_masks = [masks]
+            
+            masks = np.array(processed_masks)
 
             # Create detections for ALL players (SAM2 tracks all)
             detections = sv.Detections(
