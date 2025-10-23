@@ -27,7 +27,7 @@ class VideoPlayer:
         self.cap = cv2.VideoCapture(self.video_path)
         self.paused = False
         self._update_frame()
-        
+
     def replay(self):
         if self.video_path: self.load(self.video_path)
 
@@ -37,7 +37,7 @@ class VideoPlayer:
         if ret:
             frame_height, frame_width, _ = frame.shape
             label_width, label_height = self.label.winfo_width(), self.label.winfo_height()
-            if label_width < 2 or label_height < 2: 
+            if label_width < 2 or label_height < 2:
                 self.root.after(20, self._update_frame)
                 return
             scale = min(label_width / frame_width, label_height / frame_height)
@@ -59,11 +59,13 @@ class SegmentationApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # --- State Variables ---
-        self.input_path, self.output_path = tk.StringVar(), tk.StringVar()
-        self.player_name, self.motion_class = tk.StringVar(value="Bam Adebayo"), tk.StringVar(value="freethrow")
+        self.default_input_dir = "/fs/scratch/PAS3184"
+        self.default_output_dir = "/fs/scratch/PAS3184"
+        self.input_path, self.output_path = tk.StringVar(value=self.default_input_dir), tk.StringVar(value=self.default_output_dir)
+        self.player_name, self.motion_class = tk.StringVar(), tk.StringVar()
         self.status = tk.StringVar(value="Status: Ready")
         self.first_frame, self.initial_detections = None, None
-        self.temp_masks_json_path, self.temp_video_path = None, None  # 改为存储JSON文件路径
+        self.temp_masks_json_path, self.temp_video_path = None, None
         self.selected_player_idx = -1
 
         # --- Layout ---
@@ -127,10 +129,11 @@ class SegmentationApp:
                 print(f"Error removing temp file during reset: {e}")
 
         # Clear all state-holding variables
-        self.input_path.set("")
+        self.input_path.set(self.default_input_dir)
+        self.output_path.set(self.default_output_dir)
         self.first_frame = None
         self.initial_detections = None
-        self.temp_masks_json_path = None  # 改为清理JSON路径
+        self.temp_masks_json_path = None
         self.temp_video_path = None
         self.selected_player_idx = -1
 
@@ -161,7 +164,11 @@ class SegmentationApp:
     def update_status(self, message): self.root.after(0, lambda: self.status.set(message))
 
     def select_input(self):
-        path = filedialog.askopenfilename(filetypes=[("MP4 files", "*.mp4")])
+        initial_dir = self.input_path.get().strip()
+        if not initial_dir or not os.path.exists(initial_dir):
+            initial_dir = self.default_input_dir
+
+        path = filedialog.askopenfilename(filetypes=[("MP4 files", "*.mp4")], initialdir=initial_dir)
         if not path: return
         self.input_path.set(path)
         self.replay_og_button.config(state=tk.NORMAL)
@@ -169,7 +176,11 @@ class SegmentationApp:
         self.update_status("Status: Video loaded. Ready to start segmentation.")
 
     def select_output(self):
-        path = filedialog.askdirectory()
+        initial_dir = self.output_path.get().strip()
+        if not initial_dir or not os.path.exists(initial_dir):
+            initial_dir = self.default_output_dir
+
+        path = filedialog.askdirectory(initialdir=initial_dir)
         if path: self.output_path.set(path)
 
     def on_input_entry_enter(self):
