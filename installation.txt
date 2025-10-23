@@ -13,11 +13,11 @@ pip install --upgrade pip
 module load ffmpeg/6.1.1
 
 # Set GCC as the compiler
-export CC=gcc
+export CC=gc
 export CXX=g++
 
 # FOR INSTALLING DEPENDENCIES
-pip install torch==2.4.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+pip install torch==2.8.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 pip install numpy wheel ninja
 pip install pycocotools
 pip install Pillow
