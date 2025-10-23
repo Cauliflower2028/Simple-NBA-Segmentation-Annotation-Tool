@@ -128,6 +128,7 @@ class SegmentationApp:
             except OSError as e:
                 print(f"Error removing temp file during reset: {e}")
 
+        # Clear all state-holding variables
         self.first_frame = None
         self.initial_detections = None
         self.temp_masks_json_path = None
