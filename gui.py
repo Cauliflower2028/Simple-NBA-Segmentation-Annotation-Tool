@@ -129,6 +129,7 @@ class SegmentationApp:
                 print(f"Error removing temp file during reset: {e}")
 
         # Clear all state-holding variables
+        self.input_path.set("")
         self.first_frame = None
         self.initial_detections = None
         self.temp_masks_json_path = None
@@ -163,9 +164,6 @@ class SegmentationApp:
 
     def select_input(self):
         initial_dir = self.input_path.get().strip()
-        if not initial_dir or not os.path.exists(initial_dir):
-            initial_dir = self.default_input_dir
-
         path = filedialog.askopenfilename(filetypes=[("MP4 files", "*.mp4")], initialdir=initial_dir)
         if not path: return
         self.input_path.set(path)
@@ -175,9 +173,6 @@ class SegmentationApp:
 
     def select_output(self):
         initial_dir = self.output_path.get().strip()
-        if not initial_dir or not os.path.exists(initial_dir):
-            initial_dir = self.default_output_dir
-
         path = filedialog.askdirectory(initialdir=initial_dir)
         if path: self.output_path.set(path)
 
