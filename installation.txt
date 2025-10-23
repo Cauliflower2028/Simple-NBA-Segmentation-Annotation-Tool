@@ -1,4 +1,6 @@
 # RUN THE FOLLOWING COMMANDS
+# MAKE SURE YOU CLONE THE REPO BEFORE YOU DO THIS
+# DO EVERYTHING INSIDE THE REPO
 
 # CREATE AND ACTIVATE VENV
 conda create -n venv python=3.10 -y
@@ -15,12 +17,14 @@ export CC=gcc
 export CXX=g++
 
 # FOR INSTALLING DEPENDENCIES
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+pip install torch==2.4.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 pip install numpy wheel ninja
 pip install pycocotools
 pip install Pillow
 
 # FOR INSTALLING SAM2 REAL-TIME - RUN THE FOLLOWING COMMANDS
+## MAKE SURE YOU HAVE GPU ENABLED WHEN YOU DO THIS
+## IF YOU HAVE ISSUES WITH FLASHATTN GET A PRECOMPILED WHEEL VERSION FROM https://github.com/Dao-AILab/flash-attention/releases/tag/v2.8.3
 git clone https://github.com/Gy920/segment-anything-2-real-time.git
 cd ./segment-anything-2-real-time
 pip install -e .
